@@ -17,12 +17,16 @@ dibujado sobre la imagen original.
 ```bash
 cd "ACTIVIDAD 1"
 
-# entorno con Python 3.13 (TensorFlow no tiene ruedas para 3.14)
-uv venv --python 3.13 .venv
+uv venv
 uv pip install --python .venv/bin/python -r requirements.txt
 ```
 
-Con `pip` normal también sirve:
+No hace falta pedir la versión de Python: el archivo `.python-version` fija la
+**3.13** y `uv` la usa sola. El pin está porque TensorFlow no publica ruedas
+para Python 3.14, que es el que trae Fedora 43 de fábrica.
+
+Si usas `pyenv` en vez de `uv`, el mismo archivo le sirve: `pyenv` también lo
+lee. Con `pip` a pelo:
 
 ```bash
 python3.13 -m venv .venv
