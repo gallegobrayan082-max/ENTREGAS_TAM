@@ -44,13 +44,30 @@ Descarga MNIST (la primera vez), entrena el MLP y guarda el modelo en
 
 ## 3. Levantar la interfaz
 
+Con **Streamlit**, que es la interfaz principal:
+
+```bash
+.venv/bin/streamlit run src/app_streamlit.py
+```
+
+Y abrir <http://127.0.0.1:8501>: se sube la imagen (o se elige uno de los
+ejemplos del desplegable) y aparecen las cajas de cada dígito sobre la foto,
+más una ficha por dígito con su confianza y su posición.
+
+También hay una interfaz con **Flask**, más simple y con API JSON, por si
+hace falta consultarla desde otro programa:
+
 ```bash
 .venv/bin/python -m src.app
 ```
 
-Y abrir <http://127.0.0.1:5000>: se arrastra la imagen (o se elige con el
-botón) y aparecen las cajas de cada dígito sobre la foto, con la etiqueta y la
-confianza de cada una.
+en <http://127.0.0.1:5000>, con `POST /predecir` devolviendo **una detección
+por dígito** en JSON:
+
+```json
+{"detecciones": [{"digito": 4, "confianza": 1.0, "caja": [21, 15, 63, 75]},
+                 {"digito": 5, "confianza": 1.0, "caja": [105, 12, 165, 72]}]}
+```
 
 ## 4. Pruebas
 
@@ -161,8 +178,9 @@ ACTIVIDAD 1/
 │   ├── preprocesamiento.py   grises, polaridad, Otsu, normalización a 28x28
 │   ├── modelo.py             el MLP, la clase `fondo` y el entrenamiento
 │   ├── deteccion.py          candidatos, clasificación y no máximos
-│   ├── app.py                la interfaz web (Flask)
-│   ├── templates/index.html  la página de la interfaz
+│   ├── app_streamlit.py      la interfaz web (Streamlit)
+│   ├── app.py                la interfaz web (Flask) y su API JSON
+│   ├── templates/index.html  la página de la interfaz de Flask
 │   └── static/estilo.css
 ├── herramientas/
 │   ├── generar_ejemplos.py   crea imágenes de prueba en `ejemplos/`

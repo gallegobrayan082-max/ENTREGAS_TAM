@@ -448,18 +448,21 @@ plt.show()'''
 md(
     """## 6. La interfaz
 
-La interfaz es una aplicación de Flask. Recibe la imagen por un `POST` a
-`/predecir` y devuelve **una detección por dígito** en JSON, más la imagen con
-las cajas dibujadas.
+Hay dos interfaces sobre el mismo detector.
+
+**Streamlit** (`streamlit run src/app_streamlit.py`): se sube la imagen o se
+elige uno de los ejemplos, y se ven las cajas sobre la foto y una ficha por
+dígito con su confianza.
+
+**Flask** (`python -m src.app`): más simple, con una API JSON. Recibe la
+imagen por un `POST` a `/predecir` y devuelve **una detección por dígito**, más
+la imagen con las cajas dibujadas.
 
 ```python
 detecciones = detector.detectar(imagen)
 for d in detecciones:
     print(d.digito, d.confianza, d.caja)
-```
-
-La página web (`python -m src.app`) deja subir la imagen arrastrándola o con
-el botón, y muestra cada dígito por separado con su confianza y su caja."""
+```"""
 )
 
 codigo(
