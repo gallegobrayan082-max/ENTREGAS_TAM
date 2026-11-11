@@ -1,0 +1,200 @@
+# Actividad 1 · Detección de varios dígitos en una imagen
+
+Extiende el clasificador de MNIST del `scratchpad.ipynb` para que reciba una
+imagen con **uno o varios dígitos escritos a mano** y devuelva **una detección
+por dígito**, con su etiqueta, su confianza y su caja.
+
+Una imagen con un 4 y un 5 devuelve **dos detecciones**: un 4 y un 5. Nunca un
+número "45" del que no se pueda saber dónde acaba cada dígito.
+
+Incluye una interfaz web donde se suben las imágenes y se ve el resultado
+dibujado sobre la imagen original.
+
+---
+
+## 1. Puesta en marcha
+
+```bash
+cd "ACTIVIDAD 1"
+
+# entorno con Python 3.13 (TensorFlow no tiene ruedas para 3.14)
+uv venv --python 3.13 .venv
+uv pip install --python .venv/bin/python -r requirements.txt
+```
+
+Con `pip` normal también sirve:
+
+```bash
+python3.13 -m venv .venv
+.venv/bin/pip install -r requirements.txt
+```
+
+## 2. Entrenar el modelo
+
+```bash
+.venv/bin/python -m src.modelo
+```
+
+Descarga MNIST (la primera vez), entrena el MLP y guarda el modelo en
+`modelos/mnist_mlp.keras`. Tarda unos cuatro minutos en CPU.
+
+## 3. Levantar la interfaz
+
+```bash
+.venv/bin/python -m src.app
+```
+
+Y abrir <http://127.0.0.1:5000>: se arrastra la imagen (o se elige con el
+botón) y aparecen las cajas de cada dígito sobre la foto, con la etiqueta y la
+confianza de cada una.
+
+## 4. Pruebas
+
+```bash
+.venv/bin/python -m pytest pruebas/ -q
+```
+
+Y para medir el modelo y el detector sobre el conjunto de prueba y sobre las
+imágenes de ejemplo:
+
+```bash
+.venv/bin/python -m herramientas.evaluar
+```
+
+---
+
+## Qué se cambió respecto al `scratchpad.ipynb`
+
+El notebook ya tenía la arquitectura correcta:
+
+```
+Input(784) → Dense(64, relu) → Dense(64, relu) → Dense(10, softmax)
+```
+
+Se conserva tal cual, y se corrigieron tres cosas:
+
+**1. El preprocesamiento.** `tf.keras.datasets.mnist.load_data()` devuelve los
+píxeles como enteros en `[0, 255]` y el notebook los entregaba así al modelo.
+Aquí se normalizan a `[0, 1]`.
+
+**2. La evaluación.** El notebook entrenaba 30 épocas y no miraba el conjunto
+de prueba. Aquí se separa un 10 % para validar y se evalúa sobre el conjunto
+de prueba.
+
+**3. Una clase extra: `fondo`.** El notebook tenía diez salidas, una por
+dígito. El detector necesita una más (ver más abajo).
+
+## Cómo funciona la detección
+
+El clasificador de MNIST solo sabe responder una cosa: *este parche de 28x28 es
+un 4*. Para una imagen con varios dígitos hacen falta tres etapas, y cada una
+usa la anterior.
+
+### 1. Proponer candidatos: dónde puede haber un dígito
+
+La imagen se pasa a escala de grises, se decide su polaridad (si el trazo es
+oscuro sobre fondo claro, se invierte) y se binariza con el **método de Otsu**.
+
+La tinta se divide en **bloques**: se separa por columnas vacías y por filas
+vacías. Dos dígitos uno al lado del otro quedan en columnas distintas, así que
+quedan en bloques distintos aunque la tinta llegue a tocarse.
+
+De cada bloque se revisa su forma:
+
+- si no es más ancho que alto y no es una mota, **el bloque es un candidato**;
+- si es demasiado ancho o alto, puede esconder varios dígitos, y entonces se
+  recorre con una **ventana deslizante** que busca un dígito por ventana.
+
+### 2. Clasificar cada candidato
+
+El recorte se normaliza al formato de MNIST (recortar la tinta, escalar para
+que quepa en 20x20, centrar en el lienzo de 28x28) y se pasa al modelo, que
+devuelve la distribución de probabilidad de las once clases.
+
+### 3. Una detección por dígito
+
+Los candidatos que se solapan son el mismo dígito visto de distintas maneras.
+Se recorren de mayor a menor confianza y se conserva el primero de cada grupo:
+es la **supresión de no máximos** de la detección de objetos.
+
+El recorrido es *greedy* y no transitivo a propósito. Con un agrupamiento por
+componentes conexas, un candidato ancho que abarca dos dígitos los unía en el
+mismo grupo y el detector reportaba un solo dígito. Con el recorrido greedy, el
+4 y el 5 se conservan los dos porque no se solapan entre sí.
+
+## La clase `fondo`: por qué hace falta
+
+Esta es la parte menos obvia de la actividad, y la que más rendimiento aporta.
+
+Un modelo de diez clases no tiene forma de decir "aquí no hay un dígito". Y
+responde con una seguridad aparente: **media barra de un 4 se parece
+muchísimo a un 1**, así que el detector recibe una ventana que corta el 4 por
+la mitad, la clasifica como "1" con el 99,9 % de confianza y reporta un 1 donde
+no hay ningún 1.
+
+La solución es una clase extra, la número 10, llamada `fondo`, entrenada con
+tres tipos de ejemplos que el detector se encuentra en la práctica:
+
+| Tipo de ejemplo | Qué simula |
+|---|---|
+| un trozo de un dígito | una ventana que corta el trazo por la mitad |
+| dos dígitos en el mismo recorte | una ventana más ancha que un dígito |
+| un recorte casi vacío | ruido en la imagen |
+
+Los dígitos positivos y los ejemplos de `fondo` pasan por **el mismo
+preprocesamiento y la misma variación aleatoria** (rotación, escala, posición
+y ruido). Eso es importante: si solo variaran los dígitos, el modelo aprendería
+"forma alterada = dígito" y mandaría a `fondo` cualquier recorte con una forma
+un poco distinta, que es exactamente lo que pasaba con los 7 y los 2.
+
+## Estructura
+
+```
+ACTIVIDAD 1/
+├── scratchpad.ipynb          el notebook original, sin tocar
+├── src/
+│   ├── datos.py              carga de MNIST (Keras, con respaldo a los IDX)
+│   ├── preprocesamiento.py   grises, polaridad, Otsu, normalización a 28x28
+│   ├── modelo.py             el MLP, la clase `fondo` y el entrenamiento
+│   ├── deteccion.py          candidatos, clasificación y no máximos
+│   ├── app.py                la interfaz web (Flask)
+│   ├── templates/index.html  la página de la interfaz
+│   └── static/estilo.css
+├── herramientas/
+│   ├── generar_ejemplos.py   crea imágenes de prueba en `ejemplos/`
+│   └── evaluar.py            métricas del modelo y del detector
+├── pruebas/                  pruebas del preprocesamiento y del detector
+├── modelos/mnist_mlp.keras   el modelo entrenado
+└── ejemplos/                 imágenes de ejemplo
+```
+
+## Limitaciones y por dónde seguir
+
+- **Varios dígitos pegados entre sí.** Con dos dígitos que se tocan (un "4" y
+  un "5" sin hueco entre ellos) el detector acierta: salen un 4 y un 5. Con
+  cuatro dígitos pegados en cadena, ya no: aparecen detecciones de más. Es el
+  caso más difícil, porque no hay separación posible por columnas y la ventana
+  deslizante tiene que adivinar dónde cortar.
+- **El modelo es un MLP.** Con una red convolucional el detector mejoraría,
+  sobre todo en los recortes parciales: las convoluciones aprenden a detectar el trazo
+  donde esté, en vez de memorizar la posición exacta de los píxeles.
+- **Un solo dígito por fila.** Los dígitos apilados en vertical se detectan
+  como un bloque único.
+- **Fondo con textura.** El detector asume que la imagen es el dígito y nada
+  más; un fondo con ruido fuerte ensucia las cajas.
+
+## Resultados
+
+Con el modelo entrenado (`modelos/mnist_mlp.keras`, 40 épocas, semilla 2026):
+
+| Métrica | Valor |
+|---|---|
+| Exactitud sobre el conjunto de prueba de MNIST | 93,56 % |
+| Exactitud sobre el dígito **recortado** (como lo ve el detector) | 95,02 % |
+| Dígitos perdidos (mandados a la clase `fondo`) | 1,10 % |
+| Imágenes de ejemplo detectadas correctamente | 8 de 8 |
+
+El modelo de diez clases del `scratchpad` llega al 97,5 % de exactitud, pero no
+puede rechazar un recorte que no es un dígito: ese precio es el que paga la
+clase `fondo`, y con él el detector pasa de reportar basura con total aplomo a
+no perder dígitos.
