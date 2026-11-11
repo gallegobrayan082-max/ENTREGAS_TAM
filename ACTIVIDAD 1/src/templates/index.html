@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Detección de dígitos · Actividad 1</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='estilo.css') }}">
+</head>
+<body>
+  <header class="cabecera">
+    <div class="contenedor">
+      <h1>Detección de dígitos en una imagen</h1>
+      <p class="subtitulo">
+        Sube una imagen con uno o varios dígitos escritos a mano.
+        Cada dígito se reporta por separado: un <strong>4</strong> y un <strong>5</strong>
+        salen como dos detecciones, nunca como el número <strong>45</strong>.
+      </p>
+    </div>
+  </header>
+
+  <main class="contenedor panel">
+    <section class="columna">
+      <h2>1. Sube una imagen</h2>
+
+      <div id="zona" class="zona-soltar" tabindex="0" role="button"
+           aria-label="Zona para soltar o elegir una imagen">
+        <svg viewBox="0 0 24 24" aria-hidden="true" class="icono">
+          <path d="M12 16V4m0 0L8 8m4-4 4 4M4 16v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/>
+        </svg>
+        <p class="zona-titulo">Arrastra la imagen aquí</p>
+        <p class="zona-ayuda">o haz clic para elegir un archivo (PNG, JPG, BMP…)</p>
+        <input type="file" id="archivo" accept="image/*" hidden>
+      </div>
+
+      <div class="control">
+        <label for="umbral">
+          Confianza mínima
+          <output id="umbral-valor">85 %</output>
+        </label>
+        <input type="range" id="umbral" min="5" max="99" value="85" step="1">
+        <p class="nota">Por debajo de este valor la predicción se descarta por poco confiable.</p>
+      </div>
+
+      <div id="estado" class="estado" hidden></div>
+    </section>
+
+    <section class="columna">
+      <h2>2. Resultado</h2>
+
+      <div id="vacio" class="vacio">
+        <p>Aún no hay ninguna imagen procesada.</p>
+      </div>
+
+      <div id="resultado" hidden>
+        <figure class="lienzo">
+          <div class="marco-imagen">
+            <img id="imagen" alt="Imagen con los dígitos detectados">
+            <div id="cajas" class="cajas"></div>
+          </div>
+          <figcaption id="pie-imagen"></figcaption>
+        </figure>
+
+        <div class="encabezado-resultado">
+          <h3>Dígitos detectados</h3>
+          <span id="conteo" class="conteo"></span>
+        </div>
+        <ul id="lista" class="lista"></ul>
+
+        <a id="descargar" class="boton boton-secundario" download="deteccion.png">
+          Descargar imagen anotada
+        </a>
+      </div>
+    </section>
+  </main>
+
+  <footer class="pie">
+    <div class="contenedor">
+      MLP de Keras entrenado con MNIST · Actividad 1 · TAM
+    </div>
+  </footer>
+
+  <script>
+    const zona = document.getElementById('zona');
+    const entrada = document.getElementById('archivo');
+    const controlUmbral = document.getElementById('umbral');
+    const valorUmbral = document.getElementById('umbral-valor');
+    const estado = document.getElementById('estado');
+    const vacio = document.getElementById('vacio');
+    const resultado = document.getElementById('resultado');
+    const imagen = document.getElementById('imagen');
+    const cajas = document.getElementById('cajas');
+    const lista = document.getElementById('lista');
+    const conteo = document.getElementById('conteo');
+    const pieImagen = document.getElementById('pie-imagen');
+    const descargar = document.getElementById('descargar');
+
+    controlUmbral.addEventListener('input', () => {
+      valorUmbral.textContent = controlUmbral.value + ' %';
+    });
+
+    zona.addEventListener('click', () => entrada.click());
+    zona.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); entrada.click(); }
+    });
+    ['dragenter', 'dragover'].forEach((evento) =>
+      zona.addEventListener(evento, (e) => { e.preventDefault(); zona.classList.add('activa'); })
+    );
+    ['dragleave', 'drop'].forEach((evento) =>
+      zona.addEventListener(evento, (e) => { e.preventDefault(); zona.classList.remove('activa'); })
+    );
+    zona.addEventListener('drop', (e) => procesar(e.dataTransfer.files[0]));
+    entrada.addEventListener('change', () => procesar(entrada.files[0]));
+
+    function mostrarEstado(mensaje, tipo) {
+      estado.textContent = mensaje;
+      estado.className = 'estado ' + (tipo || '');
+      estado.hidden = !mensaje;
+    }
+
+    async function procesar(archivo) {
+      if (!archivo) return;
+      mostrarEstado('Analizando…', 'cargando');
+      resultado.hidden = true;
+      vacio.hidden = true;
+
+      const datos = new FormData();
+      datos.append('archivo', archivo);
+      datos.append('umbral', (controlUmbral.value / 100).toFixed(2));
+
+      try {
+        const respuesta = await fetch('/predecir', { method: 'POST', body: datos });
+        const cuerpo = await respuesta.json();
+        if (!respuesta.ok) throw new Error(cuerpo.error || 'Error del servidor');
+        dibujar(archivo, cuerpo);
+        mostrarEstado('', '');
+      } catch (error) {
+        mostrarEstado('No se pudo procesar la imagen: ' + error.message, 'error');
+        vacio.hidden = false;
+      }
+    }
+
+    function dibujar(archivo, cuerpo) {
+      imagen.src = URL.createObjectURL(archivo);
+      descargar.href = cuerpo.anotada;
+      pieImagen.textContent = cuerpo.ancho + ' × ' + cuerpo.alto + ' px';
+
+      cajas.innerHTML = '';
+      cuerpo.detecciones.forEach((deteccion) => {
+        const caja = document.createElement('div');
+        caja.className = 'caja';
+        caja.style.left = (deteccion.caja[0] / cuerpo.ancho * 100) + '%';
+        caja.style.top = (deteccion.caja[1] / cuerpo.alto * 100) + '%';
+        caja.style.width = ((deteccion.caja[2] - deteccion.caja[0]) / cuerpo.ancho * 100) + '%';
+        caja.style.height = ((deteccion.caja[3] - deteccion.caja[1]) / cuerpo.alto * 100) + '%';
+        caja.innerHTML = '<span class="etiqueta">' + deteccion.digito + '</span>';
+        caja.title = 'Dígito ' + deteccion.digito + ' · ' + Math.round(deteccion.confianza * 100) + '%';
+        cajas.appendChild(caja);
+      });
+
+      lista.innerHTML = '';
+      cuerpo.detecciones.forEach((deteccion, indice) => {
+        const fila = document.createElement('li');
+        fila.className = 'ficha';
+        const porcentaje = Math.round(deteccion.confianza * 100);
+        fila.innerHTML =
+          '<span class="digito">' + deteccion.digito + '</span>' +
+          '<span class="detalle">' +
+            '<span class="indice">#' + (indice + 1) + '</span>' +
+            '<span class="barra"><span style="width:' + porcentaje + '%"></span></span>' +
+            '<span class="confianza">' + porcentaje + ' %</span>' +
+          '</span>';
+        lista.appendChild(fila);
+      });
+
+      const total = cuerpo.detecciones.length;
+      conteo.textContent = total === 1 ? '1 dígito' : total + ' dígitos';
+      if (total === 0) {
+        lista.innerHTML = '<li class="vacio-lista">No se encontró ningún dígito con esa confianza.</li>';
+      }
+      resultado.hidden = false;
+    }
+  </script>
+</body>
+</html>

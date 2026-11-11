@@ -1,0 +1,319 @@
+:root {
+  --fondo: #0f1115;
+  --panel: #171a21;
+  --panel-alto: #1e222b;
+  --borde: #2a2f3a;
+  --texto: #e6e8ee;
+  --texto-suave: #9aa2b1;
+  --acento: #4ade80;
+  --acento-suave: rgba(74, 222, 128, 0.14);
+  --error: #f87171;
+  --radio: 14px;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--fondo);
+  color: var(--texto);
+  font-family: "Inter", "Segoe UI", system-ui, -apple-system, sans-serif;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+}
+
+.contenedor {
+  width: min(1080px, 100% - 2.5rem);
+  margin-inline: auto;
+}
+
+/* ------------------------------------------------------------- cabecera */
+
+.cabecera {
+  border-bottom: 1px solid var(--borde);
+  padding: 2.5rem 0 2rem;
+  background: linear-gradient(180deg, #14171e 0%, var(--fondo) 100%);
+}
+
+.cabecera h1 {
+  margin: 0 0 0.5rem;
+  font-size: clamp(1.6rem, 3.5vw, 2.3rem);
+  letter-spacing: -0.02em;
+}
+
+.subtitulo {
+  margin: 0;
+  max-width: 62ch;
+  color: var(--texto-suave);
+}
+
+.subtitulo strong { color: var(--acento); font-weight: 600; }
+
+/* --------------------------------------------------------------- panel */
+
+.panel {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: 2rem;
+  padding-block: 2.5rem 3.5rem;
+  align-items: start;
+}
+
+.columna h2 {
+  margin: 0 0 1rem;
+  font-size: 0.82rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--texto-suave);
+}
+
+/* ------------------------------------------------------- zona de carga */
+
+.zona-soltar {
+  border: 1.5px dashed var(--borde);
+  border-radius: var(--radio);
+  background: var(--panel);
+  padding: 2.5rem 1.5rem;
+  text-align: center;
+  cursor: pointer;
+  transition: border-color .18s, background .18s, transform .18s;
+}
+
+.zona-soltar:hover,
+.zona-soltar:focus-visible,
+.zona-soltar.activa {
+  border-color: var(--acento);
+  background: var(--acento-suave);
+  outline: none;
+}
+
+.zona-soltar.activa { transform: scale(1.01); }
+
+.icono {
+  width: 40px;
+  height: 40px;
+  fill: none;
+  stroke: var(--acento);
+  stroke-width: 1.7;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.zona-titulo { margin: 0.75rem 0 0.25rem; font-weight: 600; }
+.zona-ayuda { margin: 0; color: var(--texto-suave); font-size: 0.9rem; }
+
+/* ---------------------------------------------------------- controles */
+
+.control { margin-top: 1.75rem; }
+
+.control label {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  font-size: 0.92rem;
+  color: var(--texto-suave);
+}
+
+.control output {
+  font-variant-numeric: tabular-nums;
+  color: var(--acento);
+  font-weight: 600;
+}
+
+input[type="range"] {
+  width: 100%;
+  margin: 0.6rem 0 0.25rem;
+  accent-color: var(--acento);
+}
+
+.nota {
+  margin: 0;
+  font-size: 0.82rem;
+  color: var(--texto-suave);
+}
+
+.estado {
+  margin-top: 1.25rem;
+  padding: 0.7rem 1rem;
+  border-radius: 10px;
+  background: var(--panel-alto);
+  border: 1px solid var(--borde);
+  font-size: 0.9rem;
+}
+
+.estado.error { border-color: var(--error); color: var(--error); }
+.estado.cargando { color: var(--texto-suave); }
+
+/* ------------------------------------------------------------ resultado */
+
+.vacio {
+  border: 1px solid var(--borde);
+  border-radius: var(--radio);
+  background: var(--panel);
+  padding: 3rem 1.5rem;
+  text-align: center;
+  color: var(--texto-suave);
+}
+
+.lienzo { margin: 0 0 1.75rem; }
+
+.marco-imagen {
+  position: relative;
+  display: inline-block;
+  max-width: 100%;
+  border-radius: var(--radio);
+  overflow: hidden;
+  border: 1px solid var(--borde);
+  background: #000;
+  line-height: 0;
+}
+
+.marco-imagen img {
+  max-width: 100%;
+  height: auto;
+  display: block;
+}
+
+.cajas { position: absolute; inset: 0; }
+
+.caja {
+  position: absolute;
+  border: 2px solid var(--acento);
+  border-radius: 4px;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, .45);
+}
+
+.caja .etiqueta {
+  position: absolute;
+  top: -1.55em;
+  left: -2px;
+  background: var(--acento);
+  color: #06240f;
+  font-size: 0.78rem;
+  font-weight: 700;
+  line-height: 1;
+  padding: 3px 6px;
+  border-radius: 4px;
+}
+
+figcaption {
+  margin-top: 0.6rem;
+  font-size: 0.82rem;
+  color: var(--texto-suave);
+}
+
+.encabezado-resultado {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 0.85rem;
+}
+
+.encabezado-resultado h3 { margin: 0; font-size: 1.05rem; }
+
+.conteo {
+  font-size: 0.8rem;
+  color: var(--acento);
+  background: var(--acento-suave);
+  border-radius: 999px;
+  padding: 2px 10px;
+}
+
+.lista { list-style: none; margin: 0 0 1.5rem; padding: 0; display: grid; gap: 0.6rem; }
+
+.ficha {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.7rem 0.95rem;
+  background: var(--panel);
+  border: 1px solid var(--borde);
+  border-radius: 10px;
+}
+
+.digito {
+  flex: 0 0 auto;
+  width: 42px;
+  height: 42px;
+  display: grid;
+  place-items: center;
+  border-radius: 9px;
+  background: var(--acento-suave);
+  color: var(--acento);
+  font-size: 1.35rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.detalle {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.indice { color: var(--texto-suave); font-size: 0.82rem; }
+
+.barra {
+  flex: 1 1 auto;
+  height: 6px;
+  border-radius: 999px;
+  background: var(--panel-alto);
+  overflow: hidden;
+}
+
+.barra span {
+  display: block;
+  height: 100%;
+  background: var(--acento);
+  border-radius: 999px;
+}
+
+.confianza {
+  font-variant-numeric: tabular-nums;
+  font-size: 0.88rem;
+  color: var(--texto-suave);
+  min-width: 4ch;
+  text-align: right;
+}
+
+.vacio-lista {
+  padding: 1rem;
+  border: 1px dashed var(--borde);
+  border-radius: 10px;
+  color: var(--texto-suave);
+  font-size: 0.9rem;
+}
+
+/* -------------------------------------------------------------- botones */
+
+.boton {
+  display: inline-block;
+  padding: 0.6rem 1.1rem;
+  border-radius: 9px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.boton-secundario {
+  background: var(--panel-alto);
+  color: var(--texto);
+  border: 1px solid var(--borde);
+}
+
+.boton-secundario:hover { border-color: var(--acento); color: var(--acento); }
+
+/* ----------------------------------------------------------------- pie */
+
+.pie {
+  border-top: 1px solid var(--borde);
+  padding: 1.5rem 0;
+  color: var(--texto-suave);
+  font-size: 0.85rem;
+}
+
+@media (max-width: 640px) {
+  .panel { grid-template-columns: 1fr; }
+}
