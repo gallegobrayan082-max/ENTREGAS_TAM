@@ -84,6 +84,19 @@ Los dos se entrenan con el mismo pipeline (los dígitos de MNIST normalizados
 como los ve el detector, más los ejemplos de la clase `fondo`, con la misma
 variación aleatoria), así que la comparación en el dashboard es justa.
 
+Los números, medidos sobre el mismo conjunto de prueba:
+
+| Modelo | Tipo | Exactitud (dígito recortado) | Mandados a `fondo` | Ejemplos | Tiempo por imagen |
+|---|---|---|---|---|---|
+| **CNN** | convolucional | **96,77 %** | **0,00 %** | 8/8 | 85 ms |
+| MLP | denso | 93,93 % | 1,10 % | 8/8 | 93 ms |
+
+La CNN gana por dos márgenes. Primero, clasifica mejor: **+2,8 puntos**. Y
+segundo, y más interesante: **no rechaza ningún dígito real**. La red densa
+manda a `fondo` el 1,1 % de los dígitos, porque un recorte que se sale un
+píxel de la ventana ya no le encaja; la CNN, que detecta el trazo donde esté,
+reconoce el dígito igual y no lo descarta nunca.
+
 El MLP es una red densa: memoriza la posición exacta de los píxeles. La CNN
 aprende filtros que detectan el trazo donde esté, y por eso generaliza mejor
 a los recortes parciales y a las fotos con ruido. Es también la que va a

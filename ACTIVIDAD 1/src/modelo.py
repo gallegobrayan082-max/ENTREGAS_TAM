@@ -402,15 +402,19 @@ class Descriptor:
 
 
 def _tipo_de_forma(forma) -> str:
-    """Deduce si el modelo es denso o convolucional por su forma de entrada."""
-    if isinstance(forma, (list, tuple)) and len(forma) == 3:
+    """Deduce si el modelo es denso o convolucional por su forma de entrada.
+
+    Un denso recibe un vector: `(None, 784)`. Un convolucional recibe la
+    imagen: `(None, 28, 28)` o `(None, 28, 28, 1)` con el canal.
+    """
+    if isinstance(forma, (list, tuple)) and len(forma) >= 3:
         return "convolucional"
     return "denso"
 
 
 def _forma_de_entrada(modelo) -> str:
     forma = getattr(modelo, "input_shape", None)
-    if isinstance(forma, (list, tuple)) and len(forma) == 3:
+    if isinstance(forma, (list, tuple)) and len(forma) >= 3:
         return "x".join(str(dimension) for dimension in forma[1:])
     return "784"
 

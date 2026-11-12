@@ -40,10 +40,23 @@ def test_tiene_los_controles_de_la_pagina(app):
 def test_se_puede_elegir_el_modelo(app):
     """El selector de modelo es el que permite cambiar entre el MLP y la CNN."""
     assert len(app.radio) == 1
-    assert app.radio[0].value == "mnist_mlp"
+    opciones = app.radio[0].options
+    assert len(opciones) >= 1
     # la etiqueta que se ve incluye el tipo y la exactitud
-    assert "denso" in app.radio[0].options[0]
-    assert "93.6%" in app.radio[0].options[0]
+    assert any("denso" in opcion for opcion in opciones)
+    assert all("%" in opcion for opcion in opciones)
+
+
+def test_cambiar_de_modelo_en_el_dashboard(app):
+    """Al cambiar de modelo, la página se vuelve a dibujar sin errores."""
+    opciones = app.radio[0].options
+    if len(opciones) < 2:
+        pytest.skip("solo hay un modelo disponible")
+
+    app.radio[0].set_value(app.radio[0].options[1]).run()
+    assert not app.exception
+    # sigue detectando los dos dígitos del ejemplo
+    assert {m.label: m.value for m in app.metric}["Dígitos detectados"] == "2"
 
 
 def test_la_ficha_del_modelo_muestra_su_tipo_y_su_exactitud(app):

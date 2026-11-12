@@ -107,15 +107,26 @@ def test_el_registro_encuentra_los_modelos_de_la_carpeta():
     assert any(d.tipo == "denso" for d in descriptores)
 
 
+def test_la_cnn_se_reconoce_como_convolucional():
+    """La CNN recibe (28, 28, 1): tiene cuatro dimensiones, no tres."""
+    from src.modelo import _tipo_de_forma
+
+    assert _tipo_de_forma((None, 784)) == "denso"
+    assert _tipo_de_forma((None, 28, 28)) == "convolucional"
+    assert _tipo_de_forma((None, 28, 28, 1)) == "convolucional"
+
+
 def test_la_ficha_del_modelo_trae_su_exactitud():
     for descriptor in modelos_disponibles(CARPETA_MODELOS):
         assert descriptor.clases == NUMERO_DE_CLASES
-        assert descriptor.entrada == "784"
+        # la forma de entrada tiene que ser coherente con el tipo
+        if descriptor.tipo == "denso":
+            assert descriptor.entrada == "784"
+        else:
+            assert descriptor.entrada.startswith("28x28")
         assert descriptor.exactitud is not None
         assert 0.8 < descriptor.exactitud <= 1.0
-        break
-    else:  # pragma: no cover - solo si no hay modelos
-        pytest.skip("no hay modelos")
+    assert modelos_disponibles(CARPETA_MODELOS), "no hay modelos"
 
 
 def test_un_modelo_inexistente_da_error_claro():

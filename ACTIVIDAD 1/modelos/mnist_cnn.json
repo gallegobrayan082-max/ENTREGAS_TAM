@@ -1,0 +1,7 @@
+{
+  "nombre": "CNN de MNIST (11 clases)",
+  "exactitud_prueba": 0.9721,
+  "perdida_prueba": 0.143029,
+  "epocas": 8,
+  "entrenado": "2026-11-12"
+}
