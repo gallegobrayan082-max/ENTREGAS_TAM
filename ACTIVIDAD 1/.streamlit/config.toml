@@ -1,0 +1,7 @@
+[server]
+# Sin esto, Streamlit pide el correo en el primer arranque y se queda
+# esperando una respuesta en la terminal.
+showEmailPrompt = false
+
+[browser]
+gatherUsageStats = false
