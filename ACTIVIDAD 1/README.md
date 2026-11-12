@@ -73,6 +73,41 @@ lote a 784 para un modelo denso, o lo deja como imagen de 28x28 (con canal, si
 hace falta) para uno convolucional. La clase `fondo` se toma de la salida del
 modelo, así que tampoco hace falta tocar nada.
 
+### Dejarlo siempre levantado
+
+Para que el dashboard escuche en la red sin tener que levantarlo a mano, se
+puede instalar como servicio de systemd del usuario:
+
+```ini
+# ~/.config/systemd/user/detector-dashboard.service
+[Unit]
+Description=Dashboard de deteccion de digitos (Streamlit)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=/ruta/al/proyecto/ACTIVIDAD 1
+ExecStart="/ruta/al/proyecto/ACTIVIDAD 1/.venv/bin/streamlit" run src/app_streamlit.py --server.port 8501 --server.address 0.0.0.0
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=default.target
+```
+
+```bash
+systemctl --user daemon-reload
+systemctl --user enable --now detector-dashboard
+systemctl --user status detector-dashboard
+```
+
+Con `--server.address 0.0.0.0` el dashboard escuche en todas las interfaces y
+se alcanza desde otro equipo de la red con la IP del equipo o, si hay mDNS,
+con `http://<nombre-del-equipo>.local:8501`. Ojo con `WorkingDirectory=`: en
+systemd **no** admite comillas aunque la ruta tenga espacios (sí las
+admiten las órdenes, como `ExecStart`).
+
 ### Los dos modelos
 
 | Modelo | Arquitectura | Entrada | Entrenarlo |
