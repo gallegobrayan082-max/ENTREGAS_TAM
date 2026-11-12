@@ -42,19 +42,40 @@ python3.13 -m venv .venv
 Descarga MNIST (la primera vez), entrena el MLP y guarda el modelo en
 `modelos/mnist_mlp.keras`. Tarda unos cuatro minutos en CPU.
 
-## 3. Levantar la interfaz
-
-Con **Streamlit**, que es la interfaz principal:
+## 3. Levantar el dashboard
 
 ```bash
 .venv/bin/streamlit run src/app_streamlit.py
 ```
 
-Y abrir <http://127.0.0.1:8501>: se sube la imagen (o se elige uno de los
-ejemplos del desplegable) y aparecen las cajas de cada dígito sobre la foto,
-más una ficha por dígito con su confianza y su posición.
+Y abrir <http://127.0.0.1:8501>. El dashboard trae:
 
-También hay una interfaz con **Flask**, más simple y con API JSON, por si
+- **Indicadores**: cuántos dígitos se detectaron, la confianza media, el
+  tiempo que tardó y el tamaño de la imagen.
+- **La imagen anotada**, con una caja por dígito.
+- **La tabla de detecciones**: número, dígito, confianza, caja y centro.
+- **Modo por lotes**: subiendo varias imágenes sale una tabla resumen con una
+  fila por imagen.
+- **El selector de modelo** en la barra lateral (ver más abajo).
+
+### Cambiar de modelo
+
+Los modelos se leen de la carpeta `modelos/`, así que **cambiar de modelo es
+dejar el archivo ahí**: aparece en el desplegable y se puede usar desde la
+propia página, sin tocar código.
+
+Cada modelo va acompañado de una ficha `modelos/<nombre>.json` con su
+exactitud en prueba, su pérdida, las épocas y la fecha de entrenamiento; esa
+ficha es la que se muestra en el panel lateral.
+
+El detector se adapta solo al modelo: mira la forma de entrada y aplana el
+lote a 784 para un modelo denso, o lo deja como imagen de 28x28 para uno
+convolucional. La clase `fondo` se toma de la salida del modelo, así que
+tampoco hace falta tocar nada.
+
+### La otra interfaz
+
+También hay una versión con **Flask**, más simple y con API JSON, por si
 hace falta consultarla desde otro programa:
 
 ```bash
@@ -132,6 +153,21 @@ El recorte se normaliza al formato de MNIST (recortar la tinta, escalar para
 que quepa en 20x20, centrar en el lienzo de 28x28) y se pasa al modelo, que
 devuelve la distribución de probabilidad de las once clases.
 
+Al final de la normalización el fondo se deja en **negro** y el trazo en
+**blanco**: el recorte viene de una foto donde el papel es gris, y el modelo se
+entrenó con el fondo en negro.
+
+Los bordes grises de los trazos se conservan a propósito: si se pasa todo a
+binario, el modelo pierde **1,8 puntos** de exactitud (93,9 % → 92,0 %
+medido), porque en MNIST los bordes de los trazos también tienen gris.
+
+> **Sobre "consume menos recursos".** Con un modelo **denso** el fondo en
+> negro no ahorra ni una multiplicación: los ceros se multiplican igual y los
+> FLOPs son los mismos. Lo que sí mejora es que la entrada se parezca a la
+> del entrenamiento, y de ahí sale la ganancia en exactitud. Con un modelo
+> convolucional, o con una representación dispersa, los ceros sí se pueden
+> aprovechar.
+
 ### 3. Una detección por dígito
 
 Los candidatos que se solapan son el mismo dígito visto de distintas maneras.
@@ -178,10 +214,13 @@ ACTIVIDAD 1/
 │   ├── preprocesamiento.py   grises, polaridad, Otsu, normalización a 28x28
 │   ├── modelo.py             el MLP, la clase `fondo` y el entrenamiento
 │   ├── deteccion.py          candidatos, clasificación y no máximos
-│   ├── app_streamlit.py      la interfaz web (Streamlit)
+│   ├── app_streamlit.py      el dashboard (Streamlit), con selector de modelo
 │   ├── app.py                la interfaz web (Flask) y su API JSON
 │   ├── templates/index.html  la página de la interfaz de Flask
 │   └── static/estilo.css
+├── modelos/
+│   ├── mnist_mlp.keras       el modelo entrenado
+│   └── mnist_mlp.json        su ficha (exactitud, épocas, fecha)
 ├── herramientas/
 │   ├── generar_ejemplos.py   crea imágenes de prueba en `ejemplos/`
 │   └── evaluar.py            métricas del modelo y del detector

@@ -1,7 +1,7 @@
 """Pruebas de la interfaz de Streamlit.
 
 Se ejecutan con el propio framework de Streamlit (`AppTest`), que corre la
-aplicación en proceso: así se comprueba que la página se dibuja, que no
+aplicación en proceso: así se comprueba que el dashboard se dibuja, que no
 lanza excepciones y que el ejemplo de un 4 y un 5 sale como dos dígitos.
 """
 
@@ -37,19 +37,30 @@ def test_tiene_los_controles_de_la_pagina(app):
     assert [s.label for s in app.selectbox] == ["Ejemplo"]
 
 
+def test_se_puede_elegir_el_modelo(app):
+    """El selector de modelo es el que permite cambiar entre el MLP y la CNN."""
+    assert len(app.radio) == 1
+    assert app.radio[0].value == "mnist_mlp"
+    # la etiqueta que se ve incluye el tipo y la exactitud
+    assert "denso" in app.radio[0].options[0]
+    assert "93.6%" in app.radio[0].options[0]
+
+
+def test_la_ficha_del_modelo_muestra_su_tipo_y_su_exactitud(app):
+    textos = " ".join(bloque.value for bloque in app.markdown)
+    assert "Tipo:" in textos
+    assert "denso" in textos
+    assert "Exactitud en prueba" in textos
+
+
 def test_el_ejemplo_del_4_y_el_5_sale_como_dos_digitos(app):
     """El requisito de fondo: un 4 y un 5 son dos detecciones, no un 45."""
-    assert len(app.success) == 1
-    assert "2" in app.success[0].value
+    indicadores = {m.label: m.value for m in app.metric}
+    assert indicadores["Dígitos detectados"] == "2"
+    assert indicadores["Confianza media"] == "100.0%"
 
-    digitos = [
-        bloque.value
-        for bloque in app.markdown
-        if bloque.value.startswith("<div") and "font-size" in bloque.value
-    ]
-    assert len(digitos) == 2
-    assert "4" in digitos[0]
-    assert "5" in digitos[1]
+    tabla = app.dataframe[0].value
+    assert list(tabla["dígito"]) == [4, 5]
 
 
 def test_el_deslizador_cambia_el_umbral(app):

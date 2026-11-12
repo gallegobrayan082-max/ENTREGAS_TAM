@@ -226,7 +226,18 @@ Tres pasos, todos con una razón:
 
 Después, cada recorte se normaliza al formato de MNIST: se recorta la tinta, se
 escala para que quepa en 20x20 respetando la relación de aspecto y se centra
-en un lienzo de 28x28."""
+en un lienzo de 28x28. Al final el fondo se deja en **negro** y el trazo en
+**blanco**, porque el recorte viene de una foto donde el papel es gris y el
+modelo se entrenó con el fondo en negro.
+
+Los bordes grises de los trazos se conservan a propósito: si se pasa todo a
+binario, el modelo pierde **1,8 puntos** de exactitud (93,9 % → 92,0 %
+medido), porque en MNIST los bordes de los trazos también tienen gris.
+
+> Sobre "consume menos recursos": con un modelo **denso** el fondo en negro no
+> ahorra ni una multiplicación, los FLOPs son los mismos. Lo que mejora es que
+> la entrada se parezca a la del entrenamiento. Con un modelo convolucional, o
+> con una representación dispersa, los ceros sí se pueden aprovechar."""
 )
 
 codigo(
@@ -450,9 +461,10 @@ md(
 
 Hay dos interfaces sobre el mismo detector.
 
-**Streamlit** (`streamlit run src/app_streamlit.py`): se sube la imagen o se
-elige uno de los ejemplos, y se ven las cajas sobre la foto y una ficha por
-dígito con su confianza.
+**Streamlit** (`streamlit run src/app_streamlit.py`): es un dashboard con
+indicadores (dígitos detectados, confianza media, tiempo, tamaño de la
+imagen), la imagen anotada, la tabla de detecciones y un modo por lotes para
+varias imágenes.
 
 **Flask** (`python -m src.app`): más simple, con una API JSON. Recibe la
 imagen por un `POST` a `/predecir` y devuelve **una detección por dígito**, más
@@ -462,7 +474,15 @@ la imagen con las cajas dibujadas.
 detecciones = detector.detectar(imagen)
 for d in detecciones:
     print(d.digito, d.confianza, d.caja)
-```"""
+```
+
+### Cambiar de modelo
+
+El dashboard deja elegir el modelo en la barra lateral. Los modelos se leen de
+la carpeta `modelos/`, así que cambiar de modelo es dejar el archivo ahí: el
+detector se adapta solo a la forma de entrada del modelo (vector de 784 para el
+denso, imagen de 28x28 para el convolucional) y la clase `fondo` se toma de la
+salida del modelo."""
 )
 
 codigo(

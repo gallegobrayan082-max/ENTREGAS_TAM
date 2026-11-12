@@ -43,7 +43,7 @@ from PIL import Image, ImageDraw
 from scipy import ndimage
 
 from . import preprocesamiento as prep
-from .modelo import CLASE_FONDO, NUMERO_DE_DIGITOS
+from .modelo import NUMERO_DE_CLASES
 
 
 @dataclass(frozen=True)
@@ -311,6 +311,32 @@ class DetectorDeDigitos:
 
     # ----------------------------------------------------------- clasificación
 
+    @property
+    def _numero_de_clases(self) -> int:
+        """Cuántas clases tiene el modelo (los dígitos y la clase `fondo`)."""
+        forma = getattr(self.modelo, "output_shape", None)
+        if isinstance(forma, (list, tuple)) and forma and forma[-1]:
+            return int(forma[-1])
+        return NUMERO_DE_CLASES
+
+    @property
+    def _indice_fondo(self) -> int:
+        """La clase `fondo` es la última del modelo."""
+        return self._numero_de_clases - 1
+
+    def _adaptar_entrada(self, parches: np.ndarray) -> np.ndarray:
+        """Adapta el lote de parches a lo que el modelo espera recibir.
+
+        Un modelo **denso** (el MLP) recibe un vector de 784; uno
+        **convolucional** recibe la imagen de 28x28. El detector sirve para los
+        dos sin cambiar una línea, que es lo que permite cambiar de modelo
+        desde el dashboard.
+        """
+        forma = getattr(self.modelo, "input_shape", None)
+        if isinstance(forma, (list, tuple)) and len(forma) == 3:
+            return parches
+        return parches.reshape(-1, 784)
+
     def _clasificar(
         self,
         gris: np.ndarray,
@@ -345,23 +371,28 @@ class DetectorDeDigitos:
         if not vectores:
             return []
 
-        # El modelo espera un vector de 784 entradas por dígito, como en MNIST.
+        # El formato de entrada depende del modelo: vector para el denso,
+        # imagen de 28x28 para el convolucional.
         probabilidades = np.asarray(
-            self.modelo.predict(np.stack(vectores).reshape(-1, 784), verbose=0)
+            self.modelo.predict(self._adaptar_entrada(np.stack(vectores)), verbose=0)
         )
+
+        digitos = probabilidades[:, : self._indice_fondo]
+        indice_fondo = self._indice_fondo
 
         detecciones: list[Deteccion] = []
         for i, caja in enumerate(cajas_finales):
             if limpios[i]:
-                digitos = probabilidades[i][:NUMERO_DE_DIGITOS]
-                etiqueta = int(digitos.argmax())
-                confianza = float(digitos.max())
+                # La geometría ya garantiza que hay un dígito: el modelo solo
+                # decide cuál es.
+                etiqueta = int(digitos[i].argmax())
+                confianza = float(digitos[i].max())
                 if confianza < p.umbral_bloque:
                     continue
             else:
                 etiqueta = int(probabilidades[i].argmax())
                 confianza = float(probabilidades[i].max())
-                if etiqueta == CLASE_FONDO:
+                if etiqueta == indice_fondo:
                     # El modelo dice que aquí no hay un dígito completo: el
                     # recorte es un fragmento o agarra más de un dígito.
                     continue

@@ -26,12 +26,18 @@ El detector descarta lo que caiga en esa clase.
 
 from __future__ import annotations
 
+import json
+from dataclasses import dataclass
+from datetime import date
 from pathlib import Path
 
 import numpy as np
 
 RUTA_MODELO = Path(__file__).resolve().parent.parent / "modelos" / "mnist_mlp.keras"
 """Dónde se guarda el modelo entrenado."""
+
+CARPETA_MODELOS = RUTA_MODELO.parent
+"""Carpeta donde se guardan los modelos y sus fichas."""
 
 SEMILLA = 2026
 EPOQUES = 40
@@ -262,6 +268,7 @@ def entrenar(
     epochs: int = EPOQUES,
     ruta: Path | str = RUTA_MODELO,
     verbose: int = 1,
+    nombre_modelo: str | None = None,
 ) -> tuple[object, dict[str, float]]:
     """Entrena el clasificador, lo evalúa y lo guarda.
 
@@ -297,7 +304,15 @@ def entrenar(
     ruta = Path(ruta)
     ruta.parent.mkdir(parents=True, exist_ok=True)
     modelo.save(ruta)
-    return modelo, {"perdida_prueba": float(perdida), "exactitud_prueba": float(exactitud)}
+    metricas = {"perdida_prueba": float(perdida), "exactitud_prueba": float(exactitud)}
+    _guardar_ficha(
+        ruta,
+        exactitud=metricas["exactitud_prueba"],
+        perdida=metricas["perdida_prueba"],
+        epocas=epochs,
+        nombre=nombre_modelo or ruta.stem.replace("_", " "),
+    )
+    return modelo, metricas
 
 
 def cargar_modelo(ruta: Path | str = RUTA_MODELO):
@@ -311,6 +326,124 @@ def cargar_modelo(ruta: Path | str = RUTA_MODELO):
             "Entrénalo con: python -m src.modelo"
         )
     return keras.models.load_model(ruta)
+
+
+# --------------------------------------------------------------- registro
+
+
+@dataclass(frozen=True)
+class Descriptor:
+    """La ficha de un modelo: lo que el dashboard necesita para mostrarlo."""
+
+    nombre: str
+    ruta: Path
+    tipo: str
+    """`denso` (perceptrón multicapa) o `convolucional`."""
+
+    clases: int
+    """Cuántas salidas tiene: los dígitos del 0 al 9 y la clase `fondo`."""
+
+    entrada: str
+    """Qué recibe: `784` (vector) o `28x28` (imagen)."""
+
+    tamano: int
+    """Tamaño del archivo, en bytes."""
+
+    exactitud: float | None = None
+    """Exactitud en el conjunto de prueba, si la ficha la trae."""
+
+    perdida: float | None = None
+    """Pérdida en el conjunto de prueba, si la ficha la trae."""
+
+    untrained_note: str = ""
+    """Nota de la ficha (épocas, fecha, etc.)."""
+
+
+def _tipo_de_forma(forma) -> str:
+    """Deduce si el modelo es denso o convolucional por su forma de entrada."""
+    if isinstance(forma, (list, tuple)) and len(forma) == 3:
+        return "convolucional"
+    return "denso"
+
+
+def _forma_de_entrada(modelo) -> str:
+    forma = getattr(modelo, "input_shape", None)
+    if isinstance(forma, (list, tuple)) and len(forma) == 3:
+        return "x".join(str(dimension) for dimension in forma[1:])
+    return "784"
+
+
+def _leer_ficha(ruta: Path) -> dict:
+    """Lee la ficha JSON que acompaña a un modelo, si existe."""
+    ficha = ruta.with_suffix(".json")
+    if not ficha.exists():
+        return {}
+    try:
+        return json.loads(ficha.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return {}
+
+
+def describir_modelo(ruta: Path | str) -> Descriptor:
+    """Carga el modelo y arma su ficha para el dashboard."""
+    ruta = Path(ruta)
+    modelo = cargar_modelo(ruta)
+    ficha = _leer_ficha(ruta)
+
+    forma_salida = getattr(modelo, "output_shape", None)
+    clases = int(forma_salida[-1]) if forma_salida else 11
+
+    return Descriptor(
+        nombre=ficha.get("nombre", ruta.stem.replace("_", " ")),
+        ruta=ruta,
+        tipo=_tipo_de_forma(getattr(modelo, "input_shape", None)),
+        clases=clases,
+        entrada=_forma_de_entrada(modelo),
+        tamano=ruta.stat().st_size,
+        exactitud=ficha.get("exactitud_prueba"),
+        perdida=ficha.get("perdida_prueba"),
+        untrained_note=ficha.get("nota", ""),
+    )
+
+
+def modelos_disponibles(carpeta: Path | str = CARPETA_MODELOS) -> list[Descriptor]:
+    """Todos los modelos disponibles en la carpeta, listos para elegir.
+
+    Es lo que permite cambiar de modelo desde el dashboard: cuando llegue la
+    red convolucional, basta con dejarla en `modelos/` para que aparezca en
+    el desplegable.
+    """
+    carpeta = Path(carpeta)
+    if not carpeta.exists():
+        return []
+
+    descriptores: list[Descriptor] = []
+    for ruta in sorted(carpeta.glob("*.keras")):
+        try:
+            descriptores.append(describir_modelo(ruta))
+        except Exception:  # noqa: BLE001 - un modelo roto no debe tumbar la página
+            continue
+    return descriptores
+
+
+def _guardar_ficha(
+    ruta: Path,
+    exactitud: float,
+    perdida: float,
+    epocas: int,
+    nombre: str,
+) -> None:
+    """Guarda la ficha JSON que acompaña al modelo."""
+    ficha = {
+        "nombre": nombre,
+        "exactitud_prueba": round(exactitud, 6),
+        "perdida_prueba": round(perdida, 6),
+        "epocas": epocas,
+        "entrenado": date.today().isoformat(),
+    }
+    ruta.with_suffix(".json").write_text(
+        json.dumps(ficha, ensure_ascii=False, indent=2), encoding="utf-8"
+    )
 
 
 if __name__ == "__main__":  # pragma: no cover - uso manual

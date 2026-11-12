@@ -1,0 +1,8 @@
+{
+  "nombre": "MLP de MNIST (11 clases)",
+  "exactitud_prueba": 0.9356,
+  "perdida_prueba": 0.4129,
+  "epocas": 40,
+  "entrenado": "2026-11-11",
+  "nota": "Arquitectura del scratchpad.ipynb con una clase extra 'fondo'. Entrena con: python -m src.modelo"
+}
