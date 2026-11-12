@@ -297,6 +297,26 @@ ACTIVIDAD 1/
 └── ejemplos/                 imágenes de ejemplo
 ```
 
+## El cuaderno de la convolución
+
+`actividad1_cnn_deteccion.ipynb` es la segunda parte: por qué la red densa se
+queda corta en un detector, qué hace una convolución, y la comparación
+medida entre las dos redes.
+
+El experimento central es el **desplazamiento**: se toman dígitos del
+conjunto de prueba y se mueven dentro de la ventana de 28x28 **sin
+recortarlos**, para que lo único que cambie sea la posición y no la forma.
+
+| desplazamiento | MLP (densa) | CNN (convolucional) |
+|---|---|---|
+| 0 px | 95,7 % | 97,5 % |
+| 2 px | 92,8 % | 96,3 % |
+| 5 px | **73,7 %** | **83,7 %** |
+
+A un píxel las dos van igual; a cinco, hay diez puntos de diferencia. Y en
+el detector, la diferencia se traduce en **dígitos perdidos**: el MLP manda a
+`fondo` el 1,1 % de los dígitos reales y la CNN ninguno.
+
 ## Limitaciones y por dónde seguir
 
 - **Varios dígitos pegados entre sí.** Con dos dígitos que se tocan (un "4" y
