@@ -75,12 +75,24 @@ se lea como un 8.
 """
 
 
-def construir_modelo():
-    """Arma el MLP de tres capas, idéntico al del `scratchpad.ipynb`.
+def construir_modelo(tipo: str = "denso"):
+    """Arma la red que se le pida.
 
-    La única diferencia es la última capa: `NUMERO_DE_CLASES` salidas en vez
-    de 10, para poder decir "esto no es un dígito".
+    - `denso`: el MLP de tres capas, idéntico al del `scratchpad.ipynb`.
+    - `convolucional`: `Conv2D(32) → Conv2D(64) → Flatten → Dense`, la
+      arquitectura del `scratchpad_2.ipynb`.
+
+    En las dos la única diferencia con el cuaderno original es la última capa:
+    `NUMERO_DE_CLASES` salidas en vez de 10, para poder decir "esto no es un
+    dígito".
     """
+    if tipo == "convolucional":
+        return _construir_convolucional()
+    return _construir_denso()
+
+
+def _construir_denso():
+    """El perceptrón multicapa del `scratchpad.ipynb`."""
     from tensorflow import keras
     from tensorflow.keras import layers
 
@@ -89,6 +101,19 @@ def construir_modelo():
     cp2 = layers.Dense(64, activation="relu", name="cp2")(cp1)
     salida = layers.Dense(NUMERO_DE_CLASES, activation="softmax", name="salida")(cp2)
     return keras.Model(inputs=entrada, outputs=salida, name="mnist_mlp")
+
+
+def _construir_convolucional():
+    """La red convolucional del `scratchpad_2.ipynb`."""
+    from tensorflow import keras
+    from tensorflow.keras import layers
+
+    entrada = layers.Input(shape=(28, 28, 1), name="entrada")
+    conv1 = layers.Conv2D(32, kernel_size=(3, 3), activation="relu", name="conv1")(entrada)
+    conv2 = layers.Conv2D(64, kernel_size=(3, 3), activation="relu", name="conv2")(conv1)
+    plano = layers.Flatten(name="plano")(conv2)
+    salida = layers.Dense(NUMERO_DE_CLASES, activation="softmax", name="salida")(plano)
+    return keras.Model(inputs=entrada, outputs=salida, name="mnist_cnn")
 
 
 def preprocesar(imagenes: np.ndarray) -> np.ndarray:
@@ -239,7 +264,10 @@ def _preparar_digitos(x: np.ndarray) -> np.ndarray:
 
 
 def _aumentar_con_fondo(
-    x: np.ndarray, y: np.ndarray, rng: np.random.Generator
+    x: np.ndarray,
+    y: np.ndarray,
+    rng: np.random.Generator,
+    cantidad_fondo: int = CANTIDAD_DE_FONDO,
 ) -> tuple[np.ndarray, np.ndarray]:
     """Prepara el conjunto de entrenamiento.
 
@@ -249,9 +277,9 @@ def _aumentar_con_fondo(
     variaran los dígitos, el modelo aprendería "forma alterada = dígito" y
     mandaría a `fondo` cualquier recorte con una forma un poco distinta.
 
-    Devuelve las imágenes ya en `[0, 1]` y aplanadas a 784 columnas.
+    Devuelve las imágenes en `[0, 1]`, con la forma de 28x28, y las etiquetas.
     """
-    fondo = generar_ejemplos_de_fondo(x, rng)
+    fondo = generar_ejemplos_de_fondo(x, rng, cantidad_fondo)
     etiquetas_fondo = np.full(len(fondo), CLASE_FONDO, dtype=np.uint8)
 
     digitos = _preparar_digitos(x)
@@ -261,7 +289,7 @@ def _aumentar_con_fondo(
     x_total, y_total = x_total[orden], y_total[orden]
 
     x_total = _variar(x_total, rng)
-    return x_total.reshape(-1, 784), y_total
+    return x_total, y_total
 
 
 def entrenar(
@@ -269,8 +297,14 @@ def entrenar(
     ruta: Path | str = RUTA_MODELO,
     verbose: int = 1,
     nombre_modelo: str | None = None,
+    tipo: str = "denso",
+    lote: int = LOTE,
+    cantidad_fondo: int = CANTIDAD_DE_FONDO,
 ) -> tuple[object, dict[str, float]]:
     """Entrena el clasificador, lo evalúa y lo guarda.
+
+    `tipo` decide la arquitectura: `denso` (el MLP del scratchpad) o
+    `convolucional` (la del `scratchpad_2.ipynb`).
 
     Devuelve el modelo y un diccionario con la pérdida y la exactitud sobre el
     conjunto de prueba.
@@ -283,9 +317,17 @@ def entrenar(
     rng = np.random.default_rng(SEMILLA)
 
     x_ent, y_ent, x_pru, y_pru = cargar_mnist()
-    x_ent, y_ent = _aumentar_con_fondo(x_ent, y_ent, rng)
+    x_ent, y_ent = _aumentar_con_fondo(x_ent, y_ent, rng, cantidad_fondo)
 
-    modelo = construir_modelo()
+    if tipo == "convolucional":
+        # la CNN recibe la imagen de 28x28 con su canal
+        x_ent = x_ent[..., np.newaxis]
+        x_pru = preprocesar(x_pru).reshape(-1, 28, 28, 1)
+    else:
+        x_ent = x_ent.reshape(-1, 784)
+        x_pru = preprocesar(x_pru)
+
+    modelo = construir_modelo(tipo)
     modelo.compile(
         optimizer="adam",
         loss="sparse_categorical_crossentropy",
@@ -295,11 +337,11 @@ def entrenar(
         x_ent,
         y_ent,
         epochs=epochs,
-        batch_size=LOTE,
+        batch_size=lote,
         validation_split=VALIDACION,
         verbose=verbose,
     )
-    perdida, exactitud = modelo.evaluate(preprocesar(x_pru), y_pru, verbose=0)
+    perdida, exactitud = modelo.evaluate(x_pru, y_pru, verbose=0)
 
     ruta = Path(ruta)
     ruta.parent.mkdir(parents=True, exist_ok=True)
@@ -447,7 +489,28 @@ def _guardar_ficha(
 
 
 if __name__ == "__main__":  # pragma: no cover - uso manual
-    modelo, metricas = entrenar()
-    print(f"Modelo guardado en {RUTA_MODELO}")
+    import sys
+
+    tipo = sys.argv[1] if len(sys.argv) > 1 else "denso"
+    epocas = int(sys.argv[2]) if len(sys.argv) > 2 else EPOQUES
+    lote = int(sys.argv[3]) if len(sys.argv) > 3 else LOTE
+    fondo = int(sys.argv[4]) if len(sys.argv) > 4 else CANTIDAD_DE_FONDO
+    rutas = {
+        "denso": (RUTA_MODELO, "MLP de MNIST (11 clases)"),
+        "convolucional": (CARPETA_MODELOS / "mnist_cnn.keras", "CNN de MNIST (11 clases)"),
+    }
+    if tipo not in rutas:
+        raise SystemExit(f"tipo desconocido: {tipo}. Usa 'denso' o 'convolucional'.")
+    ruta, nombre = rutas[tipo]
+
+    modelo, metricas = entrenar(
+        tipo=tipo,
+        ruta=ruta,
+        nombre_modelo=nombre,
+        epochs=epocas,
+        lote=lote,
+        cantidad_fondo=fondo,
+    )
+    print(f"Modelo guardado en {ruta}")
     print(f"Pérdida en prueba: {metricas['perdida_prueba']:.4f}")
     print(f"Exactitud en prueba: {metricas['exactitud_prueba']:.4%}")

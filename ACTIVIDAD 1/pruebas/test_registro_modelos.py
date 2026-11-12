@@ -67,6 +67,33 @@ def test_el_detector_adapta_la_entrada_a_un_modelo_convolucional():
     assert modelo.recibido.shape[1:] == (28, 28)
 
 
+def test_el_detector_adapta_la_entrada_a_una_cnn_con_canal():
+    """La CNN del `scratchpad_2.ipynb` recibe (28, 28, 1): el canal se añade."""
+    modelo = ModeloFalso((None, 28, 28, 1), (None, NUMERO_DE_CLASES))
+    detector = DetectorDeDigitos(modelo, Parametros())
+    detector.detectar(imagen_con_un_trazo())
+
+    assert modelo.recibido is not None
+    assert modelo.recibido.shape[1:] == (28, 28, 1)
+
+
+def test_un_modelo_sin_clase_fondo_no_rechaza_por_fondo():
+    """Un modelo de diez clases (solo dígitos) sigue funcionando.
+
+    La clase `fondo` es una convención: si el modelo tiene una salida más que
+    dígitos, esa salida es `fondo`; si tiene exactamente diez, no hay clase
+    `fondo` y el detector se apoya solo en la geometría y en la confianza.
+    """
+    modelo = ModeloFalso((None, 784), (None, 10))
+    detector = DetectorDeDigitos(modelo, Parametros())
+    assert detector._tiene_fondo is False
+
+    # con diez clases, el "9" no se puede confundir con el fondo
+    detector = DetectorDeDigitos(ModeloFalso((None, 784), (None, 11)), Parametros())
+    assert detector._tiene_fondo is True
+    assert detector._indice_fondo == 10
+
+
 def test_la_ultima_clase_del_modelo_es_el_fondo():
     """El detector no fija el índice de `fondo`: lo toma de la salida del modelo."""
     modelo = ModeloFalso((None, 784), (None, NUMERO_DE_CLASES))

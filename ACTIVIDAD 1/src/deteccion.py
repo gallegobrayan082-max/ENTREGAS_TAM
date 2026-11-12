@@ -43,7 +43,7 @@ from PIL import Image, ImageDraw
 from scipy import ndimage
 
 from . import preprocesamiento as prep
-from .modelo import NUMERO_DE_CLASES
+from .modelo import NUMERO_DE_CLASES, NUMERO_DE_DIGITOS
 
 
 @dataclass(frozen=True)
@@ -313,11 +313,23 @@ class DetectorDeDigitos:
 
     @property
     def _numero_de_clases(self) -> int:
-        """Cuántas clases tiene el modelo (los dígitos y la clase `fondo`)."""
+        """Cuántas clases tiene el modelo."""
         forma = getattr(self.modelo, "output_shape", None)
         if isinstance(forma, (list, tuple)) and forma and forma[-1]:
             return int(forma[-1])
         return NUMERO_DE_CLASES
+
+    @property
+    def _tiene_fondo(self) -> bool:
+        """¿El modelo tiene la clase `fondo`?
+
+        La convención es que el modelo tiene una salida más que dígitos: las
+        diez de los dígitos y una última, `fondo`, para los recortes que no
+        contienen un dígito completo. Un modelo entrenado solo sobre dígitos
+        (sin esa clase) también sirve: el detector deja de usar el rechazo
+        por `fondo` y se apoya solo en la geometría y en la confianza.
+        """
+        return self._numero_de_clases > NUMERO_DE_DIGITOS
 
     @property
     def _indice_fondo(self) -> int:
@@ -328,12 +340,14 @@ class DetectorDeDigitos:
         """Adapta el lote de parches a lo que el modelo espera recibir.
 
         Un modelo **denso** (el MLP) recibe un vector de 784; uno
-        **convolucional** recibe la imagen de 28x28. El detector sirve para los
-        dos sin cambiar una línea, que es lo que permite cambiar de modelo
-        desde el dashboard.
+        **convolucional** recibe la imagen de 28x28, con o sin canal. El
+        detector sirve para los dos sin cambiar una línea, que es lo que
+        permite cambiar de modelo desde el dashboard.
         """
         forma = getattr(self.modelo, "input_shape", None)
-        if isinstance(forma, (list, tuple)) and len(forma) == 3:
+        if isinstance(forma, (list, tuple)) and len(forma) >= 3:
+            if len(forma) == 4 and forma[3] == 1:
+                return parches[..., np.newaxis]
             return parches
         return parches.reshape(-1, 784)
 
@@ -377,7 +391,7 @@ class DetectorDeDigitos:
             self.modelo.predict(self._adaptar_entrada(np.stack(vectores)), verbose=0)
         )
 
-        digitos = probabilidades[:, : self._indice_fondo]
+        digitos = probabilidades[:, :NUMERO_DE_DIGITOS]
         indice_fondo = self._indice_fondo
 
         detecciones: list[Deteccion] = []
@@ -392,7 +406,7 @@ class DetectorDeDigitos:
             else:
                 etiqueta = int(probabilidades[i].argmax())
                 confianza = float(probabilidades[i].max())
-                if etiqueta == indice_fondo:
+                if self._tiene_fondo and etiqueta == indice_fondo:
                     # El modelo dice que aquí no hay un dígito completo: el
                     # recorte es un fragmento o agarra más de un dígito.
                     continue

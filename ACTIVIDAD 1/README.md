@@ -69,9 +69,29 @@ exactitud en prueba, su pérdida, las épocas y la fecha de entrenamiento; esa
 ficha es la que se muestra en el panel lateral.
 
 El detector se adapta solo al modelo: mira la forma de entrada y aplana el
-lote a 784 para un modelo denso, o lo deja como imagen de 28x28 para uno
-convolucional. La clase `fondo` se toma de la salida del modelo, así que
-tampoco hace falta tocar nada.
+lote a 784 para un modelo denso, o lo deja como imagen de 28x28 (con canal, si
+hace falta) para uno convolucional. La clase `fondo` se toma de la salida del
+modelo, así que tampoco hace falta tocar nada.
+
+### Los dos modelos
+
+| Modelo | Arquitectura | Entrada | Entrenarlo |
+|---|---|---|---|
+| `mnist_mlp.keras` | `784 → 64 → 64 → 11` (el del `scratchpad.ipynb`) | vector de 784 | `python -m src.modelo` |
+| `mnist_cnn.keras` | `Conv2D(32) → Conv2D(64) → Flatten → 11` (la del `scratchpad_2.ipynb`) | imagen de 28×28×1 | `python -m src.modelo convolucional` |
+
+Los dos se entrenan con el mismo pipeline (los dígitos de MNIST normalizados
+como los ve el detector, más los ejemplos de la clase `fondo`, con la misma
+variación aleatoria), así que la comparación en el dashboard es justa.
+
+El MLP es una red densa: memoriza la posición exacta de los píxeles. La CNN
+aprende filtros que detectan el trazo donde esté, y por eso generaliza mejor
+a los recortes parciales y a las fotos con ruido. Es también la que va a
+usar de verdad el fondo negro: con una representación densa, los ceros del
+fondo no ahorran ni una multiplicación.
+
+> En un portátil con 2 núcleos la CNN tarda unos 3 minutos por época. En
+> Colab o con GPU, segundos.
 
 ### La otra interfaz
 
